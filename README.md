@@ -61,3 +61,7 @@ A CLI that imports httpd access logs in default format, converts them to json or
 #### IV. MVP Achieved
 #### V. Stretch Goals
 #### VI. Fin.
+
+---
+
+> Written with [StackEdit](https://stackedit.io/).
