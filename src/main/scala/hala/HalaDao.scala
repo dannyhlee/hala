@@ -17,10 +17,21 @@ import org.mongodb.scala.model.Projections._
  * application doesn't have to concern itself with mongo. */
 class HalaDao(mongoClient : MongoClient) {
 
-    val codecRegistry = fromRegistries(fromProviders(classOf[Comic]), MongoClient.DEFAULT_CODEC_REGISTRY)
-    val db = mongoClient.getDatabase("comicdb").withCodecRegistry(codecRegistry)
-    val collection : MongoCollection[Comic] = db.getCollection("comics")
 
+    // boilerplate code
+    val codecRegistry = fromRegistries(
+                            fromProviders(classOf[CommonLogEntry]),
+                            fromProviders(classOf[CombinedLogEntry]),
+                            MongoClient.DEFAULT_CODEC_REGISTRY
+                        )
+
+    val db = mongoClient.getDatabase("hala").withCodecRegistry(codecRegistry)
+
+    def getCollection(collectionName): collection = {
+
+    }
+
+    val collection : MongoCollection[Comic] = db.getCollection("comics")
 
     // we make getResults private, since it's not a functionality anyone should use
     // ComicDao for.
