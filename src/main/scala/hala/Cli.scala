@@ -3,13 +3,9 @@ package hala
 import java.io.{FileNotFoundException, IOException}
 import scala.io.StdIn
 import scala.util.matching.Regex
-import org.mongodb.scala.MongoClient
 
 /** CLI that interacts with user  */
 class Cli {
-
-    private val client = MongoClient()
-    val halaDao = new HalaDao(client)
 
     val cmdArg: Regex = "(\\w+)\\s*(.*)".r
 
