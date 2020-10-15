@@ -1,14 +1,17 @@
 package hala
 
-import java.io.FileNotFoundException
-
+import java.io.{FileNotFoundException, IOException}
 import scala.io.StdIn
 import scala.util.matching.Regex
+import org.mongodb.scala.MongoClient
 
 /** CLI that interacts with user  */
 class Cli {
 
-    val commandArgPattern: Regex = "(\\w+)\\s*(.*)".r
+    private val client = MongoClient()
+    val halaDao = new HalaDao(client)
+
+    val cmdArg: Regex = "(\\w+)\\s*(.*)".r
 
     def printWelcome(): Unit = {
         val welcomeText =
@@ -49,44 +52,60 @@ class Cli {
         print("Enter command=> ")
     }
 
+    def fnGiven(filename: String): String = {
+        if (filename.length > 0) filename else "file"
+    }
+
     /** Runs the menu prompts and directs user input */
     def menu():Unit = {
 
         printWelcome()
-        var continueMenuLoop = true
+        var keepRunning = true
 
         /* This loop will continue to prompt, listen, run code and repeat until the user exits */
-        while (continueMenuLoop) {
+        while (keepRunning) {
             printHelpFile()
             StdIn.readLine() match {
-
-                case commandArgPattern(cmd, arg) if cmd.equalsIgnoreCase("import") =>
+                // import a csv file from filesystem
+                case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("import") =>
                     try {
-                        FileUtil.getTextContent(arg)
-                          .getOrElse("No filename given")
-                          .replaceAll("\\p{Punct}", "") // remove all punctuation
-                          .toLowerCase()
-                          .split("\\s") // split into words
-                          .groupMapReduce(w => w)(w => 1)(_ + _) //
-                          .toSeq
-                          .sorted
-                          .foreach { case (word, count) => println(s"$word: $count") }
-                    } catch {
-                        case fnf: FileNotFoundException => println(s"Failed to find $arg")
+                        val lines = FileUtil.readFile(arg)
+                        for (line <- lines) {
+                            println(line)
+                        }
                     }
-                case commandArgPattern(cmd, arg) if cmd.equalsIgnoreCase("exit") =>
-                    continueMenuLoop = false
-                case commandArgPattern(cmd, arg) if cmd.equalsIgnoreCase("help") =>
-                    printHelpFile()
-                case commandArgPattern(cmd, arg) if cmd.equalsIgnoreCase("load") =>
-                    println(arg)
-                case commandArgPattern(cmd, arg) if cmd.equalsIgnoreCase("analyze") =>
+                    catch {
+                        case e : FileNotFoundException => println(s"Failed to find ${fnGiven(arg)}")
+                        case e : IOException => println(s"There was an I/O exception: $e")
+                        case _ => println("Error.  Exiting...")
+                    }
+                case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("load") =>
+                    try {
+//                        FileUtil.readFile(arg)
+//                          .getOrElse("No filename given")
+//                          .replaceAll("\\p{Punct}", "") // remove all punctuation
+//                          .toLowerCase()
+//                          .split("\\s") // split into words
+//                          .groupMapReduce(w => w)(w => 1)(_ + _) //
+//                          .toSeq
+//                          .sorted
+//                          .foreach { case (word, count) => println(s"$word: $count") }
+                    } catch {
+                        case e : FileNotFoundException => println(s"Failed to find ${fnGiven(arg)}")
+                        case e : IOException => println("There was an I/O exception")
+                        case _ => println("Error.  Exiting...")
+                    }
+                case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("analyze") =>
                     println("Analyzing")
-                case commandArgPattern(cmd, arg) if cmd.equalsIgnoreCase("list") =>
+                case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("list") =>
                     println("Listing")
-                case commandArgPattern(cmd, arg) if cmd.equalsIgnoreCase("save") =>
+                case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("save") =>
                     println(arg)
-                case notRecognized => println(s"$notRecognized not a valid command")
+                case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("help") =>
+                    printHelpFile()
+                case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("exit") =>
+                    keepRunning = false
+                case notRecognized => println(s"$notRecognized not a valid command. Please try again.")
             }
         }
     }
