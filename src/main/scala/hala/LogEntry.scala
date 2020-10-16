@@ -1,10 +1,7 @@
 package hala
 
 import java.time.LocalDateTime
-
 import org.bson.types.ObjectId
-
-import scala.annotation.tailrec
 
 /** Common Log Format (ref: https://httpd.apache.org/docs/2.4/logs.html#common)
  * LogFormat: "%h %l %u %t \"%r\" %>s %b" common
@@ -45,30 +42,31 @@ case class
   LogEntry(
      _id: ObjectId,
      hostIp: String,
-     logname: Option[String],
-     remoteUser: Option[String],
+     logname: String,
+     remoteUser: String,
      time: LocalDateTime,
      request: String,
      statusCode: Int,
      size: Int
           ) {}
 
-/** Factory for [[hala.LogEntry]] instances. */
-object LogEntry {
-  /** Creates a log entry
+/** Factory for [[hala.LogEntry]] instances.
+ * Creates a log entry
  *
-   *   @param _id ObjectId
-   *   @param hostIp String - host ip address
-   *   @param logname String or null - remote logname
-   *   @param remoteUser String or null - remote user
-   *   @param time LocalDateTime - time (java.time.LocalDateTime)
-   *   @param request String - first line of request (Method, resource requested, client used protocol)
-   *   @param statusCode Int - status code
-   *   @param size Int - response size in bytes
-   * */
-def apply(_id: ObjectId, hostIp: String, logname: Option[String],
-    remoteUser: Option[String], time: LocalDateTime, request: String,
-    statusCode: Int, size: Int ) : LogEntry = new LogEntry(_id: ObjectId,
-    hostIp: String, logname: Option[String], remoteUser: Option[String],
-    time: LocalDateTime, request: String, statusCode: Int, size: Int)
+ *    @param _id ObjectId
+ *    @param hostIp String - host ip address
+ *    @param logname String or null - remote logname
+ *    @param remoteUser String or null - remote user
+ *    @param time LocalDateTime - time (java.time.LocalDateTime)
+ *    @param request String - first line of request (Method, resource requested, client used protocol)
+ *    @param statusCode Int - status code
+ *    @param size Int - response size in bytes
+ *    */
+object LogEntry {
+  /** Creates a common log entry */
+  def apply(_id: ObjectId, hostIp: String, logname: String,
+      remoteUser: String, time: LocalDateTime, request: String,
+      statusCode: Int, size: Int) : LogEntry = new LogEntry(_id: ObjectId,
+      hostIp: String, logname: String, remoteUser: String,
+      time: LocalDateTime, request: String, statusCode: Int, size: Int)
 }

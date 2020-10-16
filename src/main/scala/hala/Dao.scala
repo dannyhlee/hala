@@ -11,8 +11,8 @@ import org.mongodb.scala.model.Updates._
 import org.mongodb.scala.model.Sorts._
 import org.mongodb.scala.model.Projections._
 
-
 class Dao(mongoClient : MongoClient) {
+
     val codecRegistry: CodecRegistry = fromRegistries(fromProviders(classOf[LogEntry]), MongoClient.DEFAULT_CODEC_REGISTRY) : CodecRegistry
     val db: MongoDatabase = mongoClient.getDatabase("hala").withCodecRegistry(codecRegistry) : MongoDatabase
     val commonCollection : MongoCollection[LogEntry] = db.getCollection("common") : MongoCollection[LogEntry]

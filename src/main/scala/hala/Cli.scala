@@ -1,13 +1,24 @@
 package hala
 
 import java.io.{FileNotFoundException, IOException}
+import java.time.LocalDateTime
+
+import org.bson.types.ObjectId
+
 import scala.io.StdIn
 import scala.util.matching.Regex
+import hala.LogEntry
+
+import scala.collection.mutable.ArrayBuffer
 
 /** CLI that interacts with user  */
 class Cli {
 
     val cmdArg: Regex = "(\\w+)\\s*(.*)".r
+
+    // source: https://databricks-prod-cloudfront.cloud.databricks.com/public/4027ec902e239c93eaaa8714f173bcfc/2096468276406480/83365179015263/5175146168120750/latest.html
+    // regex tester: https://regexr.com/5e9r6
+    val logRegex = """^(\S+),(\S+),(\S+),\[(\S+) ([+-]\S+)],"(\S+\s\S+\s\S+)",(\S+),(\S+)""".r
 
     def printWelcome(): Unit = {
         val welcomeText =
@@ -52,6 +63,21 @@ class Cli {
         if (filename.length > 0) filename else "file"
     }
 
+    def parseLogEntry(logEntry: String): Unit = {
+        println(logEntry)
+        try {
+            val logRegex(hostIp, logname, remoteUser, time, tz, request, statusCode, size) = logEntry
+            println(hostIp, logname, remoteUser, time, tz, request, statusCode, size)
+        } catch {
+            case e: Error => println(e)
+        }
+    }
+
+    case class Log(hostIp: String, logname: String, remoteUser: String,
+                   time: String, request: String, statusCode: Int, size :Int)
+
+    var logBuffer = scala.collection.mutable.ArrayBuffer.empty[Log]
+
     /** Runs the menu prompts and directs user input */
     def menu():Unit = {
 
@@ -66,14 +92,16 @@ class Cli {
                 case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("import") =>
                     try {
                         val lines = FileUtil.readFile(arg)
-                        for (line <- lines) {
-                            println(line)
-                        }
+                        lines.foreach(line=>  {
+                            val logRegex(full, hostIp, logname, remoteUser, time, request, statusCode, size) = line
+                            logBuffer += Log(hostIp, logname, remoteUser, time, request, statusCode.toInt, size.toInt)
+                        })
+                        println(logBuffer)
                     }
                     catch {
                         case e : FileNotFoundException => println(s"Failed to find ${fnGiven(arg)}")
                         case e : IOException => println(s"There was an I/O exception: $e")
-                        case _ => println("Error.  Exiting...")
+                        case other => println("other: "+ other.toString)
                     }
                 case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("load") =>
                     try {
