@@ -123,11 +123,14 @@ class Cli {
                         println(Console.BOLD + Console.RED + "Malformed entries: " + Console.RESET + errors)
                     } catch {
                         case e: FileNotFoundException => {
-                            println(s"\nFailed to find ${fnGiven(arg)}\n")
+                            println("File not found error!")
+                            println(s"\nFailed to find filename: ${fnGiven(arg)}")
                             val okFileExtensions = List("log", "csv")
                             val files = getListOfFiles(new File(System.getProperty("user.dir")), okFileExtensions)
                             println("Files in current directory with .log and .csv extensions:");
-                            files.foreach(println)
+                            println("========================================================");
+                            files.map(file => file.getName).foreach((file : String) => println(s"---> ${file}"))
+                            println()
                         }
                         case e: IOException => println(s"There was an I/O exception: $e")
                         case other : Throwable => println("Error: " + other.toString)
