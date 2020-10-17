@@ -20,6 +20,11 @@ class Cli {
     // regex tester: https://regexr.com/5e9r6
     val logRegex = """^(\S+),(\S+),(\S+),\[(\S+) ([+-]\S+)],"(\S+\s\S+\s\S+)",(\S+),(\S+)""".r
 
+    // regex for search and replace access log common -> csv
+    // search: ^(\S+) (\S+) (\S+) (\[\S+ [+-]\S+]) ("\S+\s\S+\s\S+") (\S+) (\S+)
+    // replace: $1,$2,$3,$4,$5,$6,$7
+
+
     def printWelcome(): Unit = {
         val welcomeText =
         """|    __  __________________      __   ___
@@ -74,7 +79,7 @@ class Cli {
     }
 
     case class Log(hostIp: String, logname: String, remoteUser: String,
-                   time: String, request: String, statusCode: Int, size :Int)
+                   time: String, request: String, statusCode: String, size :String)
 
     var logBuffer = scala.collection.mutable.ArrayBuffer.empty[Log]
 
@@ -90,19 +95,25 @@ class Cli {
             StdIn.readLine() match {
                 // import a csv file from filesystem
                 case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("import") =>
-                    try {
-                        val lines = FileUtil.readFile(arg)
-                        lines.foreach(line=>  {
+                    val lines = FileUtil.readFile(arg)
+                    var errors = 0
+                    var lineNum = 1
+                    lines.foreach(line => {
+                        try {
                             val logRegex(full, hostIp, logname, remoteUser, time, request, statusCode, size) = line
-                            logBuffer += Log(hostIp, logname, remoteUser, time, request, statusCode.toInt, size.toInt)
-                        })
-                        println(logBuffer)
-                    }
-                    catch {
-                        case e : FileNotFoundException => println(s"Failed to find ${fnGiven(arg)}")
-                        case e : IOException => println(s"There was an I/O exception: $e")
-                        case other => println("other: "+ other.toString)
-                    }
+                            logBuffer += Log(hostIp, logname, remoteUser, time, request, statusCode, size)
+                        }  catch {
+                            case e: FileNotFoundException => println(s"Failed to find ${fnGiven(arg)}")
+                            case e: IOException => println(s"There was an I/O exception: $e")
+                            case matchError: MatchError => println(Console.RED + "Malformed entry on Line #" +lineNum + Console.RESET + ": "+ matchError.toString); errors += 1
+                            case other => println("other: " + other.toString)
+                        } finally {
+                            lineNum += 1
+                        }
+                    })
+                    println(Console.GREEN + "Processed entries: " + Console.RESET + logBuffer.length + " lines")
+                    println(Console.RED + "Malformed entries: " + Console.RESET + errors)
+
                 case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("load") =>
                     try {
 //                        FileUtil.readFile(arg)
