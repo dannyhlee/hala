@@ -29,20 +29,4 @@ class Dao(mongoClient : MongoClient) {
 
     def getByAttribute(attribute: String, whichAttribute: String):FindObservable[LogEntry] = commonCollection.find(equal(attribute, whichAttribute))
 
-    /** Delete by title.  Returns true if deleted count is > 0, returns false otherwise.
-     * This method is a little dangerous as is */
-    def deleteByTitle(title: String): Boolean = {
-        try getResults(commonCollection.deleteMany(equal("title", title))).head
-          .getDeletedCount > 0 catch {
-            case e: Exception =>
-                e.printStackTrace() //could be better
-                false
-        }
-    }
-
-    def doIt(): Unit = {
-        printResults(commonCollection.find())
-
-//        printResults(commonCollection.insertOne(LogEntry("Test", Some(1000))))
-    }
 }

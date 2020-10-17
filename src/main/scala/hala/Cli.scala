@@ -1,8 +1,9 @@
 package hala
 
-import java.io.{FileNotFoundException, IOException}
+import java.io.{File, FileNotFoundException, IOException}
 import java.time.LocalDateTime
 
+import hala.FileUtil.getListOfFiles
 import org.bson.types.ObjectId
 
 import scala.io.StdIn
@@ -54,14 +55,13 @@ class Cli {
             || > save <collection>   : save an imported collection              |
             || > list                : list collections in database             |
             || > load <collection>   : load a collection from database          |
-            || > analyze             : display analysis of the collection       |
+            || > report              : analyze and display report               |
             || > help                : show this menu                           |
             || > exit                : exit the application                     |
             |`==================================================================' """
               .stripMargin
 
         println(helpText)
-        print("Enter command=> ")
     }
 
     def fnGiven(filename: String): String = {
@@ -78,6 +78,12 @@ class Cli {
         }
     }
 
+    def clearScreen() {
+        val ANSI_CLS: String = "\u001b[2J"
+        val ANSI_HOME: String = "\u001b[H"
+        System.out.print(ANSI_CLS + ANSI_HOME)
+    }
+
     case class Log(hostIp: String, logname: String, remoteUser: String,
                    time: String, request: String, statusCode: String, size :String)
 
@@ -87,33 +93,45 @@ class Cli {
     def menu():Unit = {
 
         printWelcome()
+        printHelpFile()
         var keepRunning = true
 
         /* This loop will continue to prompt, listen, run code and repeat until the user exits */
         while (keepRunning) {
-            printHelpFile()
+            print("Enter command=> ")
             StdIn.readLine() match {
                 // import a csv file from filesystem
                 case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("import") =>
-                    val lines = FileUtil.readFile(arg)
-                    var errors = 0
-                    var lineNum = 1
-                    lines.foreach(line => {
-                        try {
-                            val logRegex(full, hostIp, logname, remoteUser, time, request, statusCode, size) = line
-                            logBuffer += Log(hostIp, logname, remoteUser, time, request, statusCode, size)
-                        }  catch {
-                            case e: FileNotFoundException => println(s"Failed to find ${fnGiven(arg)}")
-                            case e: IOException => println(s"There was an I/O exception: $e")
-                            case matchError: MatchError => println(Console.RED + "Malformed entry on Line #" +lineNum + Console.RESET + ": "+ matchError.toString); errors += 1
-                            case other => println("other: " + other.toString)
-                        } finally {
-                            lineNum += 1
+                    try {
+                        val lines = FileUtil.readFile(arg)
+                        var errors = 0
+                        var lineNum = 1
+                        lines.foreach(line => {
+                            try {
+                                val logRegex(full, hostIp, logname, remoteUser, time, request, statusCode, size) = line
+                                logBuffer += Log(hostIp, logname, remoteUser, time, request, statusCode, size)
+                            }  catch {
+                                case e: FileNotFoundException => println(s"Failed to find ${fnGiven(arg)}")
+                                case e: IOException => println(s"There was an I/O exception: $e")
+                                case matchError: MatchError => println(Console.RED + "Malformed entry on Line #" +lineNum + Console.RESET + ": "+ matchError.toString); errors += 1
+                                case other : Throwable => println("Error: " + other.toString)
+                            } finally {
+                                lineNum += 1
+                            }
+                        })
+                        println(Console.BOLD + Console.GREEN + "Processed entries: " + Console.RESET + logBuffer.length + " lines")
+                        println(Console.BOLD + Console.RED + "Malformed entries: " + Console.RESET + errors)
+                    } catch {
+                        case e: FileNotFoundException => {
+                            println(s"\nFailed to find ${fnGiven(arg)}\n")
+                            val okFileExtensions = List("log", "csv")
+                            val files = getListOfFiles(new File(System.getProperty("user.dir")), okFileExtensions)
+                            println("Files in current directory with .log and .csv extensions:");
+                            files.foreach(println)
                         }
-                    })
-                    println(Console.GREEN + "Processed entries: " + Console.RESET + logBuffer.length + " lines")
-                    println(Console.RED + "Malformed entries: " + Console.RESET + errors)
-
+                        case e: IOException => println(s"There was an I/O exception: $e")
+                        case other : Throwable => println("Error: " + other.toString)
+                    }
                 case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("load") =>
                     try {
 //                        FileUtil.readFile(arg)
@@ -128,17 +146,19 @@ class Cli {
                     } catch {
                         case e : FileNotFoundException => println(s"Failed to find ${fnGiven(arg)}")
                         case e : IOException => println("There was an I/O exception")
-                        case _ => println("Error.  Exiting...")
+                        case other : Throwable => println("Error: " + other.toString)
                     }
-                case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("analyze") =>
+                case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("report") =>
                     println("Analyzing")
                 case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("list") =>
                     println("Listing")
                 case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("save") =>
                     println(arg)
                 case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("help") =>
+                    clearScreen()
                     printHelpFile()
                 case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("exit") =>
+                    println("Goodbye.")
                     keepRunning = false
                 case notRecognized => println(s"$notRecognized not a valid command. Please try again.")
             }
