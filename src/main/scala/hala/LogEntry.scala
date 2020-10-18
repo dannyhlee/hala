@@ -44,12 +44,14 @@ case class
      hostIp: String,
      logname: String,
      remoteUser: String,
-     time: LocalDateTime,
+     time: String,
      request: String,
-     statusCode: Int,
-     size: Int
+     statusCode: String,
+     size: String
           ) {}
 
+case class Log(hostIp: String, logname: String, remoteUser: String,
+               time: String, request: String, statusCode: String, size :String)
 /** Factory for [[hala.LogEntry]] instances.
  * Creates a log entry
  *
@@ -65,8 +67,8 @@ case class
 object LogEntry {
   /** Creates a common log entry */
   def apply(_id: ObjectId, hostIp: String, logname: String,
-      remoteUser: String, time: LocalDateTime, request: String,
-      statusCode: Int, size: Int) : LogEntry = new LogEntry(_id: ObjectId,
+      remoteUser: String, time: String, request: String,
+      statusCode: String, size: String) : LogEntry = new LogEntry(_id: ObjectId,
       hostIp: String, logname: String, remoteUser: String,
-      time: LocalDateTime, request: String, statusCode: Int, size: Int)
+      time: String, request: String, statusCode: String, size: String)
 }

@@ -5,7 +5,7 @@ import scala.concurrent.duration.{Duration, SECONDS}
 import org.mongodb.scala.bson.codecs.Macros._
 import org.bson.codecs.configuration.CodecRegistries.{fromProviders, fromRegistries}
 import org.bson.codecs.configuration.CodecRegistry
-import org.mongodb.scala.{FindObservable, MongoClient, MongoCollection, MongoDatabase, Observable}
+import org.mongodb.scala.{Document, FindObservable, MongoClient, MongoCollection, MongoDatabase, Observable}
 import org.mongodb.scala.model.Filters._
 import org.mongodb.scala.model.Updates._
 import org.mongodb.scala.model.Sorts._
@@ -16,8 +16,9 @@ class Dao(mongoClient : MongoClient) {
     val codecRegistry: CodecRegistry = fromRegistries(fromProviders(classOf[LogEntry]), MongoClient.DEFAULT_CODEC_REGISTRY) : CodecRegistry
     val db: MongoDatabase = mongoClient.getDatabase("hala").withCodecRegistry(codecRegistry) : MongoDatabase
     val commonCollection : MongoCollection[LogEntry] = db.getCollection("common") : MongoCollection[LogEntry]
+    val collection: MongoCollection[Document] = db.getCollection("common")
 
-    private def getResults[T](obs: Observable[T]): Seq[T] = {
+    def getResults[T](obs: Observable[T]): Seq[T] = {
         Await.result(obs.toFuture(), Duration(10, SECONDS))
     }
 

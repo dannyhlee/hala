@@ -9,6 +9,8 @@ import org.bson.types.ObjectId
 import scala.io.StdIn
 import scala.util.matching.Regex
 import hala.LogEntry
+import hala.Main.Dao
+import org.mongodb.scala._
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -52,6 +54,8 @@ class Cli {
             || > command <parameter> : [command description]                    |
             |`=================================================================='
             || > import <logfile>    : import csv file from local disk          |
+            || > show                : show entries in memory                   |
+            || > clear               : clear entries in memory                  |
             || > save <collection>   : save an imported collection              |
             || > list                : list collections in database             |
             || > load <collection>   : load a collection from database          |
@@ -84,10 +88,10 @@ class Cli {
         System.out.print(ANSI_CLS + ANSI_HOME)
     }
 
-    case class Log(hostIp: String, logname: String, remoteUser: String,
-                   time: String, request: String, statusCode: String, size :String)
+//    case class Log(hostIp: String, logname: String, remoteUser: String,
+//                   time: String, request: String, statusCode: String, size :String)
 
-    var logBuffer = scala.collection.mutable.ArrayBuffer.empty[Log]
+    var logBuffer = scala.collection.mutable.ArrayBuffer.empty[LogEntry]
 
     /** Runs the menu prompts and directs user input */
     def menu():Unit = {
@@ -109,7 +113,7 @@ class Cli {
                         lines.foreach(line => {
                             try {
                                 val logRegex(full, hostIp, logname, remoteUser, time, request, statusCode, size) = line
-                                logBuffer += Log(hostIp, logname, remoteUser, time, request, statusCode, size)
+                                logBuffer += LogEntry(null, hostIp, logname, remoteUser, time, request, statusCode, size)
                             }  catch {
                                 case e: FileNotFoundException => println(s"Failed to find ${fnGiven(arg)}")
                                 case e: IOException => println(s"There was an I/O exception: $e")
@@ -124,7 +128,7 @@ class Cli {
                     } catch {
                         case e: FileNotFoundException => {
                             println("File not found error!")
-                            println(s"\nFailed to find filename: ${fnGiven(arg)}")
+                            println(s"\nFailed to find ${fnGiven(arg)}")
                             val okFileExtensions = List("log", "csv")
                             val files = getListOfFiles(new File(System.getProperty("user.dir")), okFileExtensions)
                             println("Files in current directory with .log and .csv extensions:");
@@ -153,13 +157,28 @@ class Cli {
                     }
                 case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("report") =>
                     println("Analyzing")
-                case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("list") =>
-                    println("Listing")
+                case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("list") => {
+                    println("Listing database collections:")
+                    var results = Dao.getResults(Dao.db.listCollectionNames()).toList
+                    results.sorted.foreach(println)
+                }
                 case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("save") =>
                     println(arg)
                 case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("help") =>
                     clearScreen()
                     printHelpFile()
+                case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("show") =>
+                    if (logBuffer.length > 0)
+                        logBuffer.foreach(println)
+                    else
+                        println("No log entries in memory.")
+                case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("clear") =>
+                    if (logBuffer.length == 0)
+                        println("Memory is empty!")
+                    else {
+                        println(logBuffer.length + " entries cleared")
+                        logBuffer.clear
+                    }
                 case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("exit") =>
                     println("Goodbye.")
                     keepRunning = false
