@@ -50,8 +50,6 @@ case class
      size: String
           ) {}
 
-case class Log(hostIp: String, logname: String, remoteUser: String,
-               time: String, request: String, statusCode: String, size :String)
 /** Factory for [[hala.LogEntry]] instances.
  * Creates a log entry
  *

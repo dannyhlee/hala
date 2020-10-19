@@ -2,7 +2,6 @@ package hala
 
 import java.io.{File, FileNotFoundException, IOException}
 import java.time.LocalDateTime
-
 import hala.FileUtil.getListOfFiles
 import org.bson.types.ObjectId
 
@@ -11,7 +10,8 @@ import scala.util.matching.Regex
 import hala.LogEntry
 import hala.Main.Dao
 import org.mongodb.scala._
-
+import spray.json._
+import DefaultJsonProtocol._
 import scala.collection.mutable.ArrayBuffer
 
 /** CLI that interacts with user  */
@@ -21,7 +21,7 @@ class Cli {
 
     // source: https://databricks-prod-cloudfront.cloud.databricks.com/public/4027ec902e239c93eaaa8714f173bcfc/2096468276406480/83365179015263/5175146168120750/latest.html
     // regex tester: https://regexr.com/5e9r6
-    val logRegex = """^(\S+),(\S+),(\S+),\[(\S+) ([+-]\S+)],"(\S+\s\S+\s\S+)",(\S+),(\S+)""".r
+    val logRegex = """^(\S+),(\S+),(\S+),\[(\S+ [+-]\S+)],"(\S+\s\S+\s\S+)",(\S+),(\S+)""".r
 
     // regex for search and replace access log common -> csv
     // search: ^(\S+) (\S+) (\S+) (\[\S+ [+-]\S+]) ("\S+\s\S+\s\S+") (\S+) (\S+)
@@ -88,6 +88,10 @@ class Cli {
         System.out.print(ANSI_CLS + ANSI_HOME)
     }
 
+    def printLogEntry(logEntry: LogEntry): Unit = {
+        println(s"ip: ${logEntry.hostIp} | logname: ${logEntry.logname} | remote user: ${logEntry.remoteUser} | time: ${logEntry.time} | request: ${logEntry.request} | status code: ${logEntry.statusCode} | size: ${logEntry.size}")
+    }
+
 //    case class Log(hostIp: String, logname: String, remoteUser: String,
 //                   time: String, request: String, statusCode: String, size :String)
 
@@ -112,7 +116,7 @@ class Cli {
                         var lineNum = 1
                         lines.foreach(line => {
                             try {
-                                val logRegex(full, hostIp, logname, remoteUser, time, request, statusCode, size) = line
+                                val logRegex(hostIp, logname, remoteUser, time, request, statusCode, size) = line
                                 logBuffer += LogEntry(null, hostIp, logname, remoteUser, time, request, statusCode, size)
                             }  catch {
                                 case e: FileNotFoundException => println(s"Failed to find ${fnGiven(arg)}")
@@ -141,6 +145,19 @@ class Cli {
                     }
                 case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("load") =>
                     try {
+                        println("Loading from database collection:")
+                        var results : Seq[Document] = Dao.getResults(Dao.collection.find())
+                        results.foreach (result => {
+                            val source = result.toJson
+                            val jsonAst = source.parseJson
+                            val json = jsonAst.prettyPrint
+                            println(json)
+
+//                            val jsonMap = parse(jsonString).values.asInstanceOf[Map[String, Any]]
+//                            println(json)
+//                            (oid ,hostIp, logname, remoteUser, time, request, statusCode, size) = results
+//                            logBuffer += LogEntry((result.toJson))
+                        })
 //                        FileUtil.readFile(arg)
 //                          .getOrElse("No filename given")
 //                          .replaceAll("\\p{Punct}", "") // remove all punctuation
@@ -161,6 +178,7 @@ class Cli {
                     println("Listing database collections:")
                     var results = Dao.getResults(Dao.db.listCollectionNames()).toList
                     results.sorted.foreach(println)
+
                 }
                 case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("save") =>
                     println(arg)
@@ -169,7 +187,7 @@ class Cli {
                     printHelpFile()
                 case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("show") =>
                     if (logBuffer.length > 0)
-                        logBuffer.foreach(println)
+                        logBuffer.foreach(printLogEntry)
                     else
                         println("No log entries in memory.")
                 case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("clear") =>
