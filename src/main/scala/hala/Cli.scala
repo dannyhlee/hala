@@ -1,18 +1,12 @@
 package hala
 
 import java.io.{File, FileNotFoundException, IOException}
-import java.time.LocalDateTime
 import hala.FileUtil.getListOfFiles
-import org.bson.types.ObjectId
-
 import scala.io.StdIn
 import scala.util.matching.Regex
 import hala.LogEntry
 import hala.Main.Dao
 import org.mongodb.scala._
-import spray.json._
-import DefaultJsonProtocol._
-import scala.collection.mutable.ArrayBuffer
 
 /** CLI that interacts with user  */
 class Cli {
@@ -149,15 +143,23 @@ class Cli {
                         var results : Seq[Document] = Dao.getResults(Dao.collection.find())
                         results.foreach (result => {
                             val source = result.toJson
-                            val jsonAst = source.parseJson
-                            val json = jsonAst.prettyPrint
-                            println(json)
+                            println(result)
+                        })
 
+                        val logEntryTupple = results.map(doc => {
+                            (doc("_id").asObjectId().getValue, doc("hostIp").asString.getValue, doc("logname").asString.getValue,
+                              doc("remoteUser").asString.getValue, doc("time").asString.getValue, doc("request").asString.getValue,
+                              doc("statusCode").asString.getValue, doc("size").asString.getValue)
+                        })
+                        logEntryTupple.foreach(item => {
+                            logBuffer += LogEntry(item._1, item._2, item._3, item._4, item._5, item._6, item._7, item._8)
+                        })
+                        println(logBuffer)
 //                            val jsonMap = parse(jsonString).values.asInstanceOf[Map[String, Any]]
 //                            println(json)
-//                            (oid ,hostIp, logname, remoteUser, time, request, statusCode, size) = results
+//                            (oid, hostIp, logname, remoteUser, time, request, statusCode, size) = results
 //                            logBuffer += LogEntry((result.toJson))
-                        })
+
 //                        FileUtil.readFile(arg)
 //                          .getOrElse("No filename given")
 //                          .replaceAll("\\p{Punct}", "") // remove all punctuation
