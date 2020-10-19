@@ -30,4 +30,10 @@ class Dao(mongoClient : MongoClient) {
 
     def getByAttribute(attribute: String, whichAttribute: String):FindObservable[LogEntry] = commonCollection.find(equal(attribute, whichAttribute))
 
+
+    def ipTest(address : String) = {
+        val loc = requests.get("https://ipapi.co/"+address+"/json")
+        loc
+    }
+
 }

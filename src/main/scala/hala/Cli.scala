@@ -83,7 +83,10 @@ class Cli {
     }
 
     def printLogEntry(logEntry: LogEntry): Unit = {
-        println(s"ip: ${logEntry.hostIp} | logname: ${logEntry.logname} | remote user: ${logEntry.remoteUser} | time: ${logEntry.time} | request: ${logEntry.request} | status code: ${logEntry.statusCode} | size: ${logEntry.size}")
+//        println(s"ip: ${logEntry.hostIp} | logname: ${logEntry.logname} | remote user: ${logEntry.remoteUser} | time: ${logEntry.time} | request: ${logEntry.request} | status code: ${logEntry.statusCode} | size: ${logEntry.size}")
+        printf("%-9s %-15s %-5s %-5s %-27s %-40.40s %-6s %-6s\n",
+            logEntry._id, logEntry.hostIp, logEntry.logname, logEntry.remoteUser,
+            logEntry.time, logEntry.request,logEntry.statusCode,logEntry.size)
     }
 
 //    case class Log(hostIp: String, logname: String, remoteUser: String,
@@ -145,7 +148,7 @@ class Cli {
                             val source = result.toJson
                             println(result)
                         })
-
+                        println("=============================")
                         val logEntryTupple = results.map(doc => {
                             (doc("_id").asObjectId().getValue, doc("hostIp").asString.getValue, doc("logname").asString.getValue,
                               doc("remoteUser").asString.getValue, doc("time").asString.getValue, doc("request").asString.getValue,
@@ -155,27 +158,23 @@ class Cli {
                             logBuffer += LogEntry(item._1, item._2, item._3, item._4, item._5, item._6, item._7, item._8)
                         })
                         println(logBuffer)
-//                            val jsonMap = parse(jsonString).values.asInstanceOf[Map[String, Any]]
-//                            println(json)
-//                            (oid, hostIp, logname, remoteUser, time, request, statusCode, size) = results
-//                            logBuffer += LogEntry((result.toJson))
-
-//                        FileUtil.readFile(arg)
-//                          .getOrElse("No filename given")
-//                          .replaceAll("\\p{Punct}", "") // remove all punctuation
-//                          .toLowerCase()
-//                          .split("\\s") // split into words
-//                          .groupMapReduce(w => w)(w => 1)(_ + _) //
-//                          .toSeq
-//                          .sorted
-//                          .foreach { case (word, count) => println(s"$word: $count") }
                     } catch {
                         case e : FileNotFoundException => println(s"Failed to find ${fnGiven(arg)}")
                         case e : IOException => println("There was an I/O exception")
                         case other : Throwable => println("Error: " + other.toString)
                     }
-                case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("report") =>
-                    println("Analyzing")
+                case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("report") => {
+                    if (logBuffer.length == 0)
+                        println("Memory is empty!  Nothing to analyze!  Please load data first.")
+                    else {
+                        println("Analyzing..." + logBuffer.length + " entries")
+                        logBuffer.foreach(item => {
+                            println(item.hostIp)
+                            println(Dao.ipTest(item.hostIp))
+                        })
+                    }
+                }
+
                 case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("list") => {
                     println("Listing database collections:")
                     var results = Dao.getResults(Dao.db.listCollectionNames()).toList
