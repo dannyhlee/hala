@@ -1,13 +1,20 @@
 package hala
 
 import java.io.{File, FileNotFoundException, IOException}
+
 import hala.FileUtil.getListOfFiles
+
 import scala.io.StdIn
 import scala.util.matching.Regex
 import hala.LogEntry
 import hala.Main.Dao
 import org.mongodb.scala._
+import org.mongodb.scala.model.Updates._
 
+import scala.Console.{BOLD, RED, RESET}
+import hala.ReportGenerator
+import org.mongodb.scala.bson.ObjectId
+import org.mongodb.scala.model.Filters.equal
 /** CLI that interacts with user  */
 class Cli {
 
@@ -50,7 +57,7 @@ class Cli {
             || > import <logfile>    : import csv file from local disk          |
             || > show                : show entries in memory                   |
             || > clear               : clear entries in memory                  |
-            || > save <collection>   : save an imported collection              |
+            || > save <collection>   : save entries in <collection>             |
             || > list                : list collections in database             |
             || > load <collection>   : load a collection from database          |
             || > report              : analyze and display report               |
@@ -80,13 +87,6 @@ class Cli {
         val ANSI_CLS: String = "\u001b[2J"
         val ANSI_HOME: String = "\u001b[H"
         System.out.print(ANSI_CLS + ANSI_HOME)
-    }
-
-    def printLogEntry(logEntry: LogEntry): Unit = {
-//        println(s"ip: ${logEntry.hostIp} | logname: ${logEntry.logname} | remote user: ${logEntry.remoteUser} | time: ${logEntry.time} | request: ${logEntry.request} | status code: ${logEntry.statusCode} | size: ${logEntry.size}")
-        printf("%-9s %-15s %-5s %-5s %-27s %-40.40s %-6s %-6s\n",
-            logEntry._id, logEntry.hostIp, logEntry.logname, logEntry.remoteUser,
-            logEntry.time, logEntry.request,logEntry.statusCode,logEntry.size)
     }
 
 //    case class Log(hostIp: String, logname: String, remoteUser: String,
@@ -142,27 +142,66 @@ class Cli {
                     }
                 case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("load") =>
                     try {
-                        println("Loading from database collection:")
-                        var results : Seq[Document] = Dao.getResults(Dao.collection.find())
-                        results.foreach (result => {
-                            val source = result.toJson
-                            println(result)
-                        })
-                        println("=============================")
-                        val logEntryTupple = results.map(doc => {
-                            (doc("_id").asObjectId().getValue, doc("hostIp").asString.getValue, doc("logname").asString.getValue,
-                              doc("remoteUser").asString.getValue, doc("time").asString.getValue, doc("request").asString.getValue,
-                              doc("statusCode").asString.getValue, doc("size").asString.getValue)
-                        })
-                        logEntryTupple.foreach(item => {
-                            logBuffer += LogEntry(item._1, item._2, item._3, item._4, item._5, item._6, item._7, item._8)
-                        })
-                        println(logBuffer)
+                        if (arg =="") {
+                            println("No collection name.  Please use: load <collection name>")
+                        } else {
+
+                          val collection = Dao.getCollection(arg)
+                          var errors = 0
+                          var lineNum = 1
+
+                          println("Trying to load from database collection...")
+
+                          var results: Seq[Document] = Dao.getResults(collection.find())
+                          if (results.isEmpty) {
+                            println(s"Collection ${BOLD}${RED}empty${RESET} or ${BOLD}${RED}not found${RESET}.")
+                            println("=====================")
+                            println("Listing database collections:")
+                            var results = Dao.getResults(Dao.db.listCollectionNames()).toList
+                            results.sorted.foreach(println)
+                          } else {
+                            try {
+                              results.foreach(result => {
+                                val source = result.toJson
+                                println(result)
+                              })
+                              println("=============================")
+                              val logEntryTupple = results.map(doc => {
+                                (doc("_id").asObjectId().getValue, doc("hostIp").asString.getValue, doc("logname").asString.getValue,
+                                  doc("remoteUser").asString.getValue, doc("time").asString.getValue, doc("request").asString.getValue,
+                                  doc("statusCode").asString.getValue, doc("size").asString.getValue)
+                              })
+                              logEntryTupple.foreach(item => {
+                                logBuffer += LogEntry(item._1, item._2, item._3, item._4, item._5, item._6, item._7, item._8)
+                              })
+                              println(logBuffer)
+                            } catch {
+                              case e: FileNotFoundException => println(s"Failed to find ${fnGiven(arg)}")
+                              case e: IOException => println(s"There was an I/O exception: $e")
+                              case matchError: MatchError => println(Console.RED + "Malformed entry on Line #" + lineNum + Console.RESET + ": " + matchError.toString); errors += 1
+                              case other: Throwable => println("Error: " + other.toString)
+                            } finally {
+                              lineNum += 1
+                            }
+                            println(Console.BOLD + Console.GREEN + "Processed entries: " + Console.RESET + logBuffer.length + " lines")
+                            println(Console.BOLD + Console.RED + "Malformed entries: " + Console.RESET + errors)
+                          }
+                        }
                     } catch {
-                        case e : FileNotFoundException => println(s"Failed to find ${fnGiven(arg)}")
-                        case e : IOException => println("There was an I/O exception")
-                        case other : Throwable => println("Error: " + other.toString)
+                          case e: FileNotFoundException => {
+                              println("File not found error!")
+                              println(s"\nFailed to find ${fnGiven(arg)}")
+                              val okFileExtensions = List("log", "csv")
+                              val files = getListOfFiles(new File(System.getProperty("user.dir")), okFileExtensions)
+                              println("Files in current directory with .log and .csv extensions:");
+                              println("========================================================");
+                              files.map(file => file.getName).foreach((file : String) => println(s"---> ${file}"))
+                              println()
+                          }
+                          case e: IOException => println(s"There was an I/O exception: $e")
+                          case other : Throwable => println("Error: " + other.toString)
                     }
+
                 case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("report") => {
                     if (logBuffer.length == 0)
                         println("Memory is empty!  Nothing to analyze!  Please load data first.")
@@ -170,7 +209,7 @@ class Cli {
                         println("Analyzing..." + logBuffer.length + " entries")
                         logBuffer.foreach(item => {
                             println(item.hostIp)
-                            println(Dao.ipTest(item.hostIp))
+                            println(ReportGenerator.ipTest(item.hostIp))
                         })
                     }
                 }
@@ -182,22 +221,112 @@ class Cli {
 
                 }
                 case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("save") =>
-                    println(arg)
+                  try {
+                    if (arg =="") {
+                      println("No collection name.  Command syntax: save <collection name>")
+                    } else {
+                      if (Dao.doesCollectionExist(arg) < 0) {
+                        println(s"Collection ${BOLD}${RED}${arg}${RESET} not found.")
+                        println("=====================")
+                        println("Listing database collections:")
+                        var results = Dao.getResults(Dao.db.listCollectionNames()).toList
+                        results.sorted.foreach(println)
+                      } else {
+                        val collection = Dao.getCollection(arg)
+                        var duplicates = 0
+                        var added = 0
+                        println("Trying to save to database collection...")
+//                        Dao.printCollection(collection)
+//                        val id = new ObjectId("5f8ee8691a94d4204c676df5")
+//                        Dao.printResults(collection.find(equal("_id",id)))
+                        logBuffer.foreach(item => {
+
+                          val id = item._id match {
+                            case null => 0
+                            case _ => new ObjectId(item._id.toHexString)
+                          }
+
+                          if(Dao.getResults(collection.find(equal("_id", id))).isEmpty == false) {
+                            duplicates += 1
+                          } else {
+                            val doc : Document = Document(
+                              "hostIp" -> item.hostIp,
+                              "logname" -> item.logname,
+                              "remoteUser" -> item.remoteUser,
+                              "time" -> item.time,
+                              "request" -> item.request,
+                              "statusCode" -> item.statusCode,
+                              "size" -> item.size
+                            )
+                            val observable: Observable[Completed] = collection.insertOne(doc)
+                            observable.subscribe(new Observer[Completed] {
+                              override def onNext(result: Completed): Unit = print("Inserted")
+                              override def onError(e: Throwable): Unit = println("Failed")
+                              override def onComplete(): Unit = print("...")
+                            })
+                            added += 1
+                          }
+                        })
+                        if (duplicates > 0) println(duplicates + " duplicates found.  Not added.")
+                        if (added > 0) println(added + " added to collection: " + arg + ".")
+//                        try {
+//                          results.foreach(result => {
+//                            val source = result.toJson
+//                            println(result)
+//                          })
+//                          println("=============================")
+//                          val logEntryTupple = results.map(doc => {
+//                            (doc("_id").asObjectId().getValue, doc("hostIp").asString.getValue, doc("logname").asString.getValue,
+//                              doc("remoteUser").asString.getValue, doc("time").asString.getValue, doc("request").asString.getValue,
+//                              doc("statusCode").asString.getValue, doc("size").asString.getValue)
+//                          })
+//                          logEntryTupple.foreach(item => {
+//                            logBuffer += LogEntry(item._1, item._2, item._3, item._4, item._5, item._6, item._7, item._8)
+//                          })
+//                          println(logBuffer)
+//                        } catch {
+//                          case e: FileNotFoundException => println(s"Failed to find ${fnGiven(arg)}")
+//                          case e: IOException => println(s"There was an I/O exception: $e")
+//                          case matchError: MatchError => println(Console.RED + "Malformed entry on Line #" + lineNum + Console.RESET + ": " + matchError.toString); errors += 1
+//                          case other: Throwable => println("Error: " + other.toString)
+//                        } finally {
+//                          lineNum += 1
+//                        }
+//                        println(Console.BOLD + Console.GREEN + "Processed entries: " + Console.RESET + logBuffer.length + " lines")
+//                        println(Console.BOLD + Console.RED + "Malformed entries: " + Console.RESET + errors)
+                      }
+                    }
+                  } catch {
+                    case e: FileNotFoundException => {
+                      println("File not found error!")
+                      println(s"\nFailed to find ${fnGiven(arg)}")
+                      val okFileExtensions = List("log", "csv")
+                      val files = getListOfFiles(new File(System.getProperty("user.dir")), okFileExtensions)
+                      println("Files in current directory with .log and .csv extensions:");
+                      println("========================================================");
+                      files.map(file => file.getName).foreach((file : String) => println(s"---> ${file}"))
+                      println()
+                    }
+                    case e: IOException => println(s"There was an I/O exception: $e")
+                    case other : Throwable => println("Error: " + other.toString)
+                  }
                 case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("help") =>
                     clearScreen()
                     printHelpFile()
                 case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("show") =>
-                    if (logBuffer.length > 0)
-                        logBuffer.foreach(printLogEntry)
-                    else
+                    if (logBuffer.length > 0) {
+                        logBuffer.foreach(FileUtil.printLogEntry)
+                        println(s"There are ${Console.BLUE}${Console.BOLD}${logBuffer.length} ${Console.RESET}entries in memory.")
+                    } else
                         println("No log entries in memory.")
                 case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("clear") =>
-                    if (logBuffer.length == 0)
-                        println("Memory is empty!")
-                    else {
-                        println(logBuffer.length + " entries cleared")
-                        logBuffer.clear
+                    println("Attempting to clear memory of logs...")
+                    val response = logBuffer.length match {
+                        case 0 => println("Memory is empty!")
+                        case 1 => println(s"${Console.RED}${Console.BOLD}${logBuffer.length} entry cleared.${Console.RESET}")
+                        case _ => println(s"${Console.RED}${Console.BOLD}${logBuffer.length} entries cleared.${Console.RESET}")
                     }
+                    logBuffer.clear
                 case cmdArg(cmd, arg) if cmd.equalsIgnoreCase("exit") =>
                     println("Goodbye.")
                     keepRunning = false

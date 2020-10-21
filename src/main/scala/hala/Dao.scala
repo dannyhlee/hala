@@ -26,14 +26,20 @@ class Dao(mongoClient : MongoClient) {
         getResults(obs).foreach(println(_))
     }
 
+    def printCollection(collection : MongoCollection[Document]): Unit = {
+        collection.find().foreach(println)
+    }
+
+    def getCollection(collectionName :String): MongoCollection[Document] = {
+         db.getCollection(collectionName)
+    }
+
+    def doesCollectionExist(collectionName : String): Int = {
+        getResults(db.listCollectionNames()).indexOf(collectionName)
+    }
+
     def getCommonCollection(string: String): Seq[LogEntry] = getResults(commonCollection.find())
 
     def getByAttribute(attribute: String, whichAttribute: String):FindObservable[LogEntry] = commonCollection.find(equal(attribute, whichAttribute))
-
-
-    def ipTest(address : String) = {
-        val loc = requests.get("https://ipapi.co/"+address+"/json")
-        loc
-    }
 
 }
